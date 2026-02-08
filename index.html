@@ -243,13 +243,13 @@
                     <input type="radio" name="mode" value="select" checked onchange="changeMode()">
                     Select/Move
                 </label>
+                
+                <div class="color-separator"></div>
+                
+                <label>Draw Lines:</label>
                 <label class="mode-option">
-                    <input type="radio" name="mode" value="straight" onchange="changeMode()">
-                    Draw Straight
-                </label>
-                <label class="mode-option">
-                    <input type="radio" name="mode" value="curved" onchange="changeMode()">
-                    Draw Curved
+                    <input type="checkbox" id="lineDrawingToggle" onchange="toggleLineDrawing()">
+                    Enabled
                 </label>
                 
                 <div class="color-separator"></div>
@@ -267,6 +267,9 @@
                 
                 <button class="btn btn-warning" onclick="clearAllLines()" style="margin-left: auto;">Clear All Lines</button>
                 <button class="btn btn-secondary" onclick="clearLastLine()">Clear Last Line</button>
+                <button class="btn" onclick="saveConfiguration()">💾 Save</button>
+                <button class="btn" onclick="document.getElementById('loadFile').click()">📂 Load</button>
+                <input type="file" id="loadFile" accept=".json" style="display:none" onchange="loadConfiguration(event)">
             </div>
             <div class="canvas-container">
                 <canvas id="pitch"></canvas>
@@ -308,6 +311,20 @@
         let isDrawing = false;
         let currentLine = [];
         let lines = [];
+        
+        // Zoom and pan state
+        let scale = 1;
+        let offsetX = 0;
+        let offsetY = 0;
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        
+        // Line drawing mode
+        let lineDrawingEnabled = false;
+        
+        // Shadow tokens (one per player)
+        let shadows = new Map(); // playerKey -> {x, y, name, color}
 
         // Canvas setup
         const canvas = document.getElementById('pitch');
@@ -347,6 +364,34 @@
                 else fontSize = 6;
 
                 ctx.fillStyle = 'white';
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(displayName, this.x, this.y);
+            }
+            
+            drawShadow() {
+                // Draw semi-transparent shadow circle
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, PLAYER_RADIUS, 0, Math.PI * 2);
+                ctx.fillStyle = this.color + '40'; // Add transparency
+                ctx.fill();
+                ctx.strokeStyle = 'gray';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([3, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Draw name with dynamic sizing
+                const displayName = this.name.substring(0, 6).toUpperCase();
+                const nameLength = displayName.length;
+                let fontSize;
+                if (nameLength <= 3) fontSize = 9;
+                else if (nameLength === 4) fontSize = 8;
+                else if (nameLength === 5) fontSize = 7;
+                else fontSize = 6;
+
+                ctx.fillStyle = '#888888';
                 ctx.font = `bold ${fontSize}px Arial`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -487,15 +532,15 @@
             // Team Red (top side)
             const redPositions = [
                 [42.5, 10],     // GK
-                [25, 25], [70, 25],           // Full-Backs
+                [25, 25], [47, 25], [70, 25],           // Full-Backs
                 [25, 40], [47, 40], [70, 40],           // Half-Backs
                 [35, 70], [60, 70],                       // Midfield
                 [25, 100], [47, 100], [70, 100],        // Half-Forwards
-                [25, 115], [70, 115],        // Full-Forwards
+                [25, 115], [47, 115], [70, 115],        // Full-Forwards
             ];
             
-            const redNames = ["GK", "LFB", "RFB", "LHB", "CHB", "RHB", 
-                             "LM", "RM", "LHF", "CHF", "RHF", "LFF", "RFF"];
+            const redNames = ["GK", "LFB", "FB", "RFB", "LHB", "CHB", "RHB", 
+                             "LM", "RM", "LHF", "CHF", "RHF", "LFF", "FF", "RFF"];
             
             redPositions.forEach(([x, y], i) => {
                 players.red.push(new Player(x * SCALE, y * SCALE, redNames[i], '#ff4444', 'red'));
@@ -504,15 +549,15 @@
             // Team Blue (bottom side)
             const bluePositions = [
                 [42.5, 130],    // GK
-                [65, 115], [20, 115],        // Full-Backs
+                [65, 115], [42.5, 115], [20, 115],        // Full-Backs
                 [65, 100], [42.5, 100], [20, 100],        // Half-Backs
                 [55, 70], [30, 70],                       // Midfield
                 [65, 40], [42.5, 40], [20, 40],           // Half-Forwards
-                [65, 25], [20, 25],           // Full-Forwards
+                [65, 25], [42.5, 25], [20, 25],           // Full-Forwards
             ];
             
-            const blueNames = ["BEEZ", "RFB", "LFB", "RHB", "CHB", "LHB",
-                              "RM", "LM", "RHF", "CHF", "LHF", "RFF", "LFF"];
+            const blueNames = ["BEEZ", "RFB", "FB", "LFB", "RHB", "CHB", "LHB",
+                              "RM", "LM", "RHF", "CHF", "LHF", "RFF", "FF", "LFF"];
             
             bluePositions.forEach(([x, y], i) => {
                 players.blue.push(new Player(x * SCALE, y * SCALE, blueNames[i], '#3EA846', 'blue'));
@@ -611,10 +656,115 @@
             isDrawing = false;
             currentLine = [];
         }
+        
+        // Toggle line drawing
+        function toggleLineDrawing() {
+            lineDrawingEnabled = document.getElementById('lineDrawingToggle').checked;
+        }
+        
+        // Save configuration to JSON file
+        function saveConfiguration() {
+            const config = {
+                players: {
+                    red: players.red.map(p => ({
+                        x: p.x, y: p.y, name: p.name, 
+                        savedX: p.savedX, savedY: p.savedY
+                    })),
+                    blue: players.blue.map(p => ({
+                        x: p.x, y: p.y, name: p.name,
+                        savedX: p.savedX, savedY: p.savedY
+                    }))
+                },
+                lines: lines.map(l => ({
+                    points: l.points,
+                    color: l.color,
+                    curved: l.curved
+                })),
+                shadows: Array.from(shadows.entries()).map(([key, shadow]) => ({
+                    key: key,
+                    shadow: shadow
+                }))
+            };
+            
+            const json = JSON.stringify(config, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gaelic-formation-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // Load configuration from JSON file
+        function loadConfiguration(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const config = JSON.parse(e.target.result);
+                    
+                    // Clear existing data
+                    players.red = [];
+                    players.blue = [];
+                    lines = [];
+                    shadows.clear();
+                    
+                    // Load players
+                    ['red', 'blue'].forEach(team => {
+                        const color = team === 'red' ? '#ff4444' : '#3EA846';
+                        config.players[team].forEach(p => {
+                            const player = new Player(p.x, p.y, p.name, color, team);
+                            player.savedX = p.savedX;
+                            player.savedY = p.savedY;
+                            players[team].push(player);
+                        });
+                    });
+                    
+                    // Load lines
+                    config.lines.forEach(l => {
+                        lines.push(new Line(l.points, l.color, l.curved));
+                    });
+                    
+                    // Load shadows
+                    if (config.shadows) {
+                        config.shadows.forEach(({key, shadow}) => {
+                            shadows.set(key, shadow);
+                        });
+                    }
+                    
+                    updateRosterDisplays();
+                    render();
+                    alert('Configuration loaded successfully!');
+                } catch (err) {
+                    alert('Error loading file: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            
+            // Reset file input
+            event.target.value = '';
+        }
+        
+        // Apply zoom transform
+        function applyTransform() {
+            ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+        }
+        
+        // Convert screen coordinates to canvas coordinates (accounting for zoom/pan)
+        function screenToCanvas(screenX, screenY) {
+            return {
+                x: (screenX - offsetX) / scale,
+                y: (screenY - offsetY) / scale
+            };
+        }
 
         // Clear lines
         function clearAllLines() {
             lines = [];
+            shadows.clear();
             render();
         }
 
@@ -628,15 +778,30 @@
         // Get canvas coordinates
         function getCanvasCoords(event) {
             const rect = canvas.getBoundingClientRect();
-            return {
-                x: event.clientX - rect.left,
-                y: event.clientY - rect.top
-            };
+            const screenX = event.clientX - rect.left;
+            const screenY = event.clientY - rect.top;
+            return screenToCanvas(screenX, screenY);
+        }
+        
+        // Get player key for shadow tracking
+        function getPlayerKey(player) {
+            return `${player.team}-${player.name}`;
         }
 
         // Mouse events
         canvas.addEventListener('mousedown', (e) => {
             const coords = getCanvasCoords(e);
+            
+            // Middle mouse or ctrl+click for panning
+            if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+                isPanning = true;
+                const rect = canvas.getBoundingClientRect();
+                panStartX = e.clientX - rect.left - offsetX;
+                panStartY = e.clientY - rect.top - offsetY;
+                canvas.style.cursor = 'grabbing';
+                e.preventDefault();
+                return;
+            }
             
             if (mode === 'select') {
                 const allPlayers = [...players.red, ...players.blue];
@@ -644,43 +809,67 @@
                     if (player.containsPoint(coords.x, coords.y)) {
                         selectedPlayer = player;
                         isDragging = true;
+                        
+                        // If line drawing is enabled, record start position
+                        if (lineDrawingEnabled) {
+                            const key = getPlayerKey(player);
+                            const existingShadow = shadows.get(key);
+                            
+                            // If there's already a shadow, this is a continuation
+                            // Remove old shadow, create new one at current position
+                            if (existingShadow) {
+                                // Shadow stays at original position, will be updated
+                            } else {
+                                // First move - create shadow at current position
+                                shadows.set(key, {
+                                    x: player.x,
+                                    y: player.y,
+                                    name: player.name,
+                                    color: player.color
+                                });
+                            }
+                            
+                            // Start a new line from current position
+                            currentLine = [player.x, player.y];
+                        }
                         return;
                     }
                 }
-            } else if (mode === 'straight' || mode === 'curved') {
-                isDrawing = true;
-                currentLine = [coords.x, coords.y];
             }
         });
 
         canvas.addEventListener('mousemove', (e) => {
+            // Handle panning
+            if (isPanning) {
+                const rect = canvas.getBoundingClientRect();
+                offsetX = e.clientX - rect.left - panStartX;
+                offsetY = e.clientY - rect.top - panStartY;
+                render();
+                return;
+            }
+            
             const coords = getCanvasCoords(e);
             
             if (mode === 'select' && isDragging && selectedPlayer) {
                 selectedPlayer.x = coords.x;
                 selectedPlayer.y = coords.y;
-                render();
-            } else if ((mode === 'straight' || mode === 'curved') && isDrawing) {
-                if (currentLine.length >= 2) {
-                    if (mode === 'straight') {
-                        currentLine[currentLine.length - 2] = coords.x;
-                        currentLine[currentLine.length - 1] = coords.y;
-                    } else {
-                        currentLine.push(coords.x, coords.y);
-                    }
-                } else {
+                
+                // If line drawing is enabled, add to current line
+                if (lineDrawingEnabled && currentLine.length >= 2) {
                     currentLine.push(coords.x, coords.y);
                 }
+                
                 render();
                 
-                // Draw preview with selected color
-                if (currentLine.length >= 4) {
+                // Draw preview line if line drawing is enabled
+                if (lineDrawingEnabled && currentLine.length >= 4) {
                     const previewColor = document.getElementById('lineColor').value;
                     ctx.save();
+                    applyTransform();
                     ctx.strokeStyle = previewColor;
                     ctx.lineWidth = 2;
                     ctx.lineCap = 'round';
-                    ctx.setLineDash([5, 5]); // Dashed line for preview
+                    ctx.setLineDash([5, 5]);
                     ctx.beginPath();
                     ctx.moveTo(currentLine[0], currentLine[1]);
                     for (let i = 2; i < currentLine.length; i += 2) {
@@ -693,37 +882,93 @@
         });
 
         canvas.addEventListener('mouseup', (e) => {
+            if (isPanning) {
+                isPanning = false;
+                canvas.style.cursor = mode === 'select' ? 'default' : 'crosshair';
+                return;
+            }
+            
             const coords = getCanvasCoords(e);
             
             if (mode === 'select') {
-                isDragging = false;
-                selectedPlayer = null;
-            } else if ((mode === 'straight' || mode === 'curved') && isDrawing) {
-                if (currentLine.length >= 2) {
-                    if (currentLine.length === 2) {
-                        currentLine.push(coords.x, coords.y);
-                    } else {
-                        currentLine[currentLine.length - 2] = coords.x;
-                        currentLine[currentLine.length - 1] = coords.y;
+                if (isDragging && selectedPlayer) {
+                    // Finalize line if line drawing was enabled
+                    if (lineDrawingEnabled && currentLine.length >= 4) {
+                        const color = document.getElementById('lineColor').value;
+                        
+                        // Update the shadow position to where the drag started
+                        const key = getPlayerKey(selectedPlayer);
+                        const shadow = shadows.get(key);
+                        if (shadow) {
+                            // Shadow should be at the start of the line
+                            shadow.x = currentLine[0];
+                            shadow.y = currentLine[1];
+                        }
+                        
+                        // Add the final position to the line
+                        currentLine[currentLine.length - 2] = selectedPlayer.x;
+                        currentLine[currentLine.length - 1] = selectedPlayer.y;
+                        
+                        // Create the line (always treated as curved for smooth paths)
+                        lines.push(new Line([...currentLine], color, true));
+                        currentLine = [];
                     }
                 }
                 
-                if (currentLine.length >= 4) {
-                    // Get selected color from dropdown
-                    const color = document.getElementById('lineColor').value;
-                    lines.push(new Line([...currentLine], color, mode === 'curved'));
-                }
-                
-                isDrawing = false;
-                currentLine = [];
-                render();
+                isDragging = false;
+                selectedPlayer = null;
             }
+        });
+        
+        // Mouse wheel for zooming
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // Get mouse position in canvas coordinates before zoom
+            const beforeX = (mouseX - offsetX) / scale;
+            const beforeY = (mouseY - offsetY) / scale;
+            
+            // Adjust zoom
+            const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+            const newScale = Math.min(Math.max(0.5, scale * zoomFactor), 5);
+            
+            // Calculate new offset to keep mouse position steady
+            const afterX = beforeX * newScale;
+            const afterY = beforeY * newScale;
+            
+            offsetX = mouseX - afterX;
+            offsetY = mouseY - afterY;
+            scale = newScale;
+            
+            render();
         });
 
         // Render everything
         function render() {
+            // Clear and reset transform
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Apply zoom and pan
+            applyTransform();
+            
+            // Draw pitch
             drawPitch();
+            
+            // Draw lines
             lines.forEach(line => line.draw());
+            
+            // Draw shadow tokens
+            shadows.forEach(shadow => {
+                const tempPlayer = new Player(shadow.x, shadow.y, shadow.name, shadow.color, '');
+                tempPlayer.drawShadow();
+            });
+            
+            // Draw players
             [...players.red, ...players.blue].forEach(player => player.draw());
         }
 
