@@ -376,20 +376,30 @@
             draw() {
                 if (this.points.length < 4) return;
 
+                // Draw the line
+                ctx.save(); // Save current context state
                 ctx.strokeStyle = this.color;
                 ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
                 ctx.beginPath();
                 ctx.moveTo(this.points[0], this.points[1]);
 
                 if (this.curved) {
+                    // Draw all points for curved lines
                     for (let i = 2; i < this.points.length; i += 2) {
                         ctx.lineTo(this.points[i], this.points[i + 1]);
                     }
                 } else {
-                    ctx.lineTo(this.points[this.points.length - 2], this.points[this.points.length - 1]);
+                    // Draw straight line to the end point
+                    const endX = this.points[this.points.length - 2];
+                    const endY = this.points[this.points.length - 1];
+                    ctx.lineTo(endX, endY);
                 }
 
                 ctx.stroke();
+                ctx.restore(); // Restore context state
 
                 // Draw arrowhead
                 if (this.points.length >= 4) {
@@ -666,8 +676,10 @@
                 // Draw preview with selected color
                 if (currentLine.length >= 4) {
                     const previewColor = document.getElementById('lineColor').value;
+                    ctx.save();
                     ctx.strokeStyle = previewColor;
                     ctx.lineWidth = 2;
+                    ctx.lineCap = 'round';
                     ctx.setLineDash([5, 5]); // Dashed line for preview
                     ctx.beginPath();
                     ctx.moveTo(currentLine[0], currentLine[1]);
@@ -675,7 +687,7 @@
                         ctx.lineTo(currentLine[i], currentLine[i + 1]);
                     }
                     ctx.stroke();
-                    ctx.setLineDash([]); // Reset to solid line
+                    ctx.restore();
                 }
             }
         });
