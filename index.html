@@ -243,6 +243,10 @@
                     <input type="radio" name="mode" value="select" checked onchange="changeMode()">
                     Select/Move
                 </label>
+                <label class="mode-option">
+                    <input type="radio" name="mode" value="pan" onchange="changeMode()">
+                    Pan View
+                </label>
                 
                 <div class="color-separator"></div>
                 
@@ -533,9 +537,9 @@
             const redPositions = [
                 [42.5, 10],     // GK
                 [25, 25], [70, 25],           // Full-Backs
-                [25, 40], [47, 45], [70, 40],           // Half-Backs
+                [25, 40], [47, 35], [70, 40],           // Half-Backs
                 [35, 70], [60, 70],                       // Midfield
-                [25, 100], [47, 95], [70, 100],        // Half-Forwards
+                [25, 100], [47, 85], [70, 100],        // Half-Forwards
                 [25, 115], [70, 115],        // Full-Forwards
             ];
             
@@ -550,13 +554,13 @@
             const bluePositions = [
                 [42.5, 130],    // GK
                 [65, 115], [20, 115],        // Full-Backs
-                [65, 100], [42.5, 95], [20, 100],        // Half-Backs
+                [65, 100], [42.5, 85], [20, 100],        // Half-Backs
                 [55, 70], [30, 70],                       // Midfield
-                [65, 40], [42.5, 45], [20, 40],           // Half-Forwards
+                [65, 40], [42.5, 35], [20, 40],           // Half-Forwards
                 [65, 25], [20, 25],           // Full-Forwards
             ];
             
-            const blueNames = ["BEEZ", "RFB", "LFB", "RHB", "CHB", "LHB",
+            const blueNames = ["BEEZ", "RFB","LFB", "RHB", "CHB", "LHB",
                               "RM", "LM", "RHF", "CHF", "LHF", "RFF", "LFF"];
             
             bluePositions.forEach(([x, y], i) => {
@@ -650,9 +654,16 @@
         // Change mode
         function changeMode() {
             mode = document.querySelector('input[name="mode"]:checked').value;
-            canvas.className = mode === 'select' ? 'select-mode' : '';
+            if (mode === 'select') {
+                canvas.className = 'select-mode';
+                canvas.style.cursor = 'default';
+            } else if (mode === 'pan') {
+                canvas.className = '';
+                canvas.style.cursor = 'grab';
+            }
             selectedPlayer = null;
             isDragging = false;
+            isPanning = false;
             isDrawing = false;
             currentLine = [];
         }
@@ -792,17 +803,17 @@
         canvas.addEventListener('mousedown', (e) => {
             const coords = getCanvasCoords(e);
             
-            // Middle mouse or ctrl+click for panning
-            if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+            // Pan mode
+            if (mode === 'pan') {
                 isPanning = true;
                 const rect = canvas.getBoundingClientRect();
                 panStartX = e.clientX - rect.left - offsetX;
                 panStartY = e.clientY - rect.top - offsetY;
                 canvas.style.cursor = 'grabbing';
-                e.preventDefault();
                 return;
             }
             
+            // Select/Move mode
             if (mode === 'select') {
                 const allPlayers = [...players.red, ...players.blue];
                 for (const player of allPlayers) {
@@ -840,7 +851,7 @@
 
         canvas.addEventListener('mousemove', (e) => {
             // Handle panning
-            if (isPanning) {
+            if (isPanning && mode === 'pan') {
                 const rect = canvas.getBoundingClientRect();
                 offsetX = e.clientX - rect.left - panStartX;
                 offsetY = e.clientY - rect.top - panStartY;
@@ -882,9 +893,9 @@
         });
 
         canvas.addEventListener('mouseup', (e) => {
-            if (isPanning) {
+            if (isPanning && mode === 'pan') {
                 isPanning = false;
-                canvas.style.cursor = mode === 'select' ? 'default' : 'crosshair';
+                canvas.style.cursor = 'grab';
                 return;
             }
             
