@@ -66,7 +66,7 @@
         }
 
         .player-item.blue {
-            border-left: 3px solid #4444ff;
+            border-left: 3px solid #3EA846;
         }
 
         .player-name {
@@ -157,10 +157,32 @@
             margin-right: 5px;
         }
 
+        .toolbar select {
+            padding: 5px 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            background: white;
+        }
+
+        .toolbar select:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
         .mode-option {
             display: flex;
             align-items: center;
             cursor: pointer;
+        }
+
+        .color-separator {
+            height: 30px;
+            width: 2px;
+            background: #ddd;
+            margin: 0 5px;
         }
 
         .canvas-container {
@@ -229,6 +251,20 @@
                     <input type="radio" name="mode" value="curved" onchange="changeMode()">
                     Draw Curved
                 </label>
+                
+                <div class="color-separator"></div>
+                
+                <label>Line Color:</label>
+                <select id="lineColor">
+                    <option value="#000000">Black</option>
+                    <option value="#ffffff">White</option>
+                    <option value="#ffff00" selected>Yellow</option>
+                    <option value="#ff4444">Red</option>
+                    <option value="#3EA846">Blue</option>
+                    <option value="#8b4513">Brown</option>
+                    <option value="#ff69b4">Pink</option>
+                </select>
+                
                 <button class="btn btn-warning" onclick="clearAllLines()" style="margin-left: auto;">Clear All Lines</button>
                 <button class="btn btn-secondary" onclick="clearLastLine()">Clear Last Line</button>
             </div>
@@ -465,11 +501,11 @@
                 [65, 25], [42.5, 25], [20, 25],           // Full-Forwards
             ];
             
-            const blueNames = ["GK", "RFB", "FB", "LFB", "RHB", "CHB", "LHB",
+            const blueNames = ["BEEZ", "RFB", "FB", "LFB", "RHB", "CHB", "LHB",
                               "RM", "LM", "RHF", "CHF", "LHF", "RFF", "FF", "LFF"];
             
             bluePositions.forEach(([x, y], i) => {
-                players.blue.push(new Player(x * SCALE, y * SCALE, blueNames[i], '#4444ff', 'blue'));
+                players.blue.push(new Player(x * SCALE, y * SCALE, blueNames[i], '#3EA846', 'blue'));
             });
 
             updateRosterDisplays();
@@ -505,7 +541,7 @@
 
             const name = prompt('Enter player name:');
             if (name) {
-                const color = team === 'red' ? '#ff4444' : '#4444ff';
+                const color = team === 'red' ? '#ff4444' : '#3EA846';
                 const x = (10 + players[team].length * 5) * SCALE;
                 const y = team === 'red' ? 10 * SCALE : (PITCH_LENGTH - 10) * SCALE;
                 
@@ -543,7 +579,7 @@
 
         // Reset team positions
         function resetTeamPositions(team) {
-            const color = team === 'red' ? '#ff4444' : '#4444ff';
+            const color = team === 'red' ? '#ff4444' : '#3EA846';
             
             players[team].forEach(player => {
                 if (player.x !== player.savedX || player.y !== player.savedY) {
@@ -627,16 +663,19 @@
                 }
                 render();
                 
-                // Draw preview
+                // Draw preview with selected color
                 if (currentLine.length >= 4) {
-                    ctx.strokeStyle = 'yellow';
+                    const previewColor = document.getElementById('lineColor').value;
+                    ctx.strokeStyle = previewColor;
                     ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]); // Dashed line for preview
                     ctx.beginPath();
                     ctx.moveTo(currentLine[0], currentLine[1]);
                     for (let i = 2; i < currentLine.length; i += 2) {
                         ctx.lineTo(currentLine[i], currentLine[i + 1]);
                     }
                     ctx.stroke();
+                    ctx.setLineDash([]); // Reset to solid line
                 }
             }
         });
@@ -658,7 +697,8 @@
                 }
                 
                 if (currentLine.length >= 4) {
-                    const color = currentLine[1] < CANVAS_HEIGHT / 2 ? '#ff4444' : '#4444ff';
+                    // Get selected color from dropdown
+                    const color = document.getElementById('lineColor').value;
                     lines.push(new Line([...currentLine], color, mode === 'curved'));
                 }
                 
