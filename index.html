@@ -532,15 +532,15 @@
             // Team Red (top side)
             const redPositions = [
                 [42.5, 10],     // GK
-                [25, 25], [47, 25], [70, 25],           // Full-Backs
+                [25, 25], [70, 25],           // Full-Backs
                 [25, 40], [47, 40], [70, 40],           // Half-Backs
                 [35, 70], [60, 70],                       // Midfield
                 [25, 100], [47, 100], [70, 100],        // Half-Forwards
-                [25, 115], [47, 115], [70, 115],        // Full-Forwards
+                [25, 115], [70, 115],        // Full-Forwards
             ];
             
-            const redNames = ["GK", "LFB", "FB", "RFB", "LHB", "CHB", "RHB", 
-                             "LM", "RM", "LHF", "CHF", "RHF", "LFF", "FF", "RFF"];
+            const redNames = ["GK", "LFB", "RFB", "LHB", "CHB", "RHB", 
+                             "LM", "RM", "LHF", "CHF", "RHF", "LFF", "RFF"];
             
             redPositions.forEach(([x, y], i) => {
                 players.red.push(new Player(x * SCALE, y * SCALE, redNames[i], '#ff4444', 'red'));
@@ -549,15 +549,15 @@
             // Team Blue (bottom side)
             const bluePositions = [
                 [42.5, 130],    // GK
-                [65, 115], [42.5, 115], [20, 115],        // Full-Backs
-                [65, 100], [42.5, 100], [20, 100],        // Half-Backs
+                [65, 115], [20, 115],        // Full-Backs
+                [65, 100], [42.5, 115], [20, 100],        // Half-Backs
                 [55, 70], [30, 70],                       // Midfield
-                [65, 40], [42.5, 40], [20, 40],           // Half-Forwards
-                [65, 25], [42.5, 25], [20, 25],           // Full-Forwards
+                [65, 40], [42.5, 45], [20, 40],           // Half-Forwards
+                [65, 25], [20, 25],           // Full-Forwards
             ];
             
-            const blueNames = ["BEEZ", "RFB", "FB", "LFB", "RHB", "CHB", "LHB",
-                              "RM", "LM", "RHF", "CHF", "LHF", "RFF", "FF", "LFF"];
+            const blueNames = ["BEEZ", "RFB", "LFB", "RHB", "CHB", "LHB",
+                              "RM", "LM", "RHF", "CHF", "LHF", "RFF", "LFF"];
             
             bluePositions.forEach(([x, y], i) => {
                 players.blue.push(new Player(x * SCALE, y * SCALE, blueNames[i], '#3EA846', 'blue'));
